@@ -5,6 +5,7 @@ import { useParams } from "next/navigation"
 import Link from "next/link"
 import { useSession } from "next-auth/react"
 import ReviewsSection from "@/components/ReviewsSection"
+import WishlistButton from "@/components/WishlistButton"
 
 interface Dataset {
   id: string
@@ -196,21 +197,26 @@ export default function DatasetDetailPage() {
             </div>
 
             {session ? (
-              dataset.isFree ? (
-                <Link
-                  href={`/api/datasets/${dataset.id}/download`}
-                  className="block w-full text-center px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 mb-4"
-                >
-                  無料でダウンロード
-                </Link>
-              ) : (
-                <Link
-                  href={`/purchase/${dataset.id}`}
-                  className="block w-full text-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 mb-4"
-                >
-                  購入する
-                </Link>
-              )
+              <>
+                {dataset.isFree ? (
+                  <Link
+                    href={`/api/datasets/${dataset.id}/download`}
+                    className="block w-full text-center px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 mb-4"
+                  >
+                    無料でダウンロード
+                  </Link>
+                ) : (
+                  <Link
+                    href={`/purchase/${dataset.id}`}
+                    className="block w-full text-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 mb-4"
+                  >
+                    購入する
+                  </Link>
+                )}
+                <div className="mb-4">
+                  <WishlistButton datasetId={dataset.id} />
+                </div>
+              </>
             ) : (
               <Link
                 href="/auth/signin"

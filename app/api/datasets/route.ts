@@ -6,6 +6,8 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url)
     const search = searchParams.get("search")
     const category = searchParams.get("category")
+    const isFree = searchParams.get("isFree")
+    const sortBy = searchParams.get("sortBy") || "newest"
     const status = searchParams.get("status") || "PUBLISHED"
 
     const where: any = {
@@ -24,6 +26,27 @@ export async function GET(request: Request) {
       where.categoryId = category
     }
 
+    if (isFree !== null && isFree !== undefined) {
+      where.isFree = isFree === "true"
+    }
+
+    let orderBy: any = {}
+    switch (sortBy) {
+      case "popular":
+        orderBy = { purchases: "desc" }
+        break
+      case "rating":
+        orderBy = { rating: "desc" }
+        break
+      case "price":
+        orderBy = { price: "asc" }
+        break
+      case "newest":
+      default:
+        orderBy = { createdAt: "desc" }
+        break
+    }
+
     const datasets = await prisma.dataset.findMany({
       where,
       include: {
@@ -34,13 +57,12 @@ export async function GET(request: Request) {
         },
         category: {
           select: {
+            id: true,
             name: true,
           },
         },
       },
-      orderBy: {
-        createdAt: "desc",
-      },
+      orderBy,
       take: 100,
     })
 

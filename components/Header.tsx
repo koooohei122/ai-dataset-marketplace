@@ -20,6 +20,12 @@ export default function Header() {
           
           {session ? (
             <>
+              <Link href="/wishlist" className="text-gray-700 dark:text-gray-300 hover:text-blue-600">
+                ウィッシュリスト
+              </Link>
+              <Link href="/purchases" className="text-gray-700 dark:text-gray-300 hover:text-blue-600">
+                購入履歴
+              </Link>
               <Link href="/dashboard" className="text-gray-700 dark:text-gray-300 hover:text-blue-600">
                 ダッシュボード
               </Link>
