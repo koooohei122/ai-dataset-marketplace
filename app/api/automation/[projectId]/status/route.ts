@@ -8,7 +8,6 @@ export async function GET(
   try {
     const { projectId } = params;
     
-    // 実際にはデータベースから取得
     const project = getProject(projectId);
 
     if (!project) {
