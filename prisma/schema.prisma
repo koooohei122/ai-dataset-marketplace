@@ -1,0 +1,278 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  name          String
+  passwordHash  String?
+  role          UserRole  @default(BUYER)
+  avatar        String?
+  bio           String?
+  emailVerified DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  datasets      Dataset[]
+  purchases     Purchase[]
+  reviews       Review[]
+  sellerProfile SellerProfile?
+  accounts      Account[]
+  sessions      Session[]
+
+  @@index([email])
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(uuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(uuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+enum UserRole {
+  BUYER
+  SELLER
+  ADMIN
+}
+
+model SellerProfile {
+  id          String   @id @default(uuid())
+  userId      String   @unique
+  companyName String?
+  verified    Boolean  @default(false)
+  rating      Float    @default(0)
+  totalSales  Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("seller_profiles")
+}
+
+model Category {
+  id          String     @id @default(uuid())
+  name        String
+  slug        String     @unique
+  description String?
+  parentId    String?
+  icon        String?
+  order       Int        @default(0)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children Category[] @relation("CategoryTree")
+  datasets Dataset[]
+
+  @@index([slug])
+  @@map("categories")
+}
+
+model Dataset {
+  id            String        @id @default(uuid())
+  title         String
+  description   String        @db.Text
+  categoryId    String
+  tags          String[]
+  price         Decimal       @db.Decimal(10, 2) // 0以上（0 = 無料）
+  isFree        Boolean       @default(false)    // 無料データセットかどうか
+  currency      String        @default("JPY")
+  license       String
+  licenseDetails String?      @db.Text
+  size          BigInt
+  fileCount     Int
+  format        String[]
+  language      String[]
+  status        DatasetStatus @default(DRAFT)
+  sellerId      String
+  views         Int           @default(0)
+  purchases     Int           @default(0)
+  rating        Float         @default(0)
+  reviewCount   Int           @default(0)
+  metadata      Json?
+  augmentationInfo Json?      // AI拡張情報
+  publishedAt   DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  // Relations
+  category      Category      @relation(fields: [categoryId], references: [id])
+  seller        User          @relation(fields: [sellerId], references: [id])
+  files         DatasetFile[]
+  purchases_rel Purchase[]
+  reviews       Review[]
+
+  @@index([categoryId])
+  @@index([sellerId])
+  @@index([status])
+  @@index([createdAt])
+  @@fulltext([title, description])
+  @@map("datasets")
+}
+
+enum DatasetStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+model DatasetFile {
+  id         String   @id @default(uuid())
+  datasetId  String
+  fileName   String
+  filePath   String
+  fileSize   BigInt
+  fileType   String
+  order      Int      @default(0)
+  isSample   Boolean  @default(false)
+  isGenerated Boolean @default(false) // AI生成されたファイルかどうか
+  sourceFileId String? // 元になったファイルのID（生成ファイルの場合）
+  createdAt  DateTime @default(now())
+
+  dataset Dataset @relation(fields: [datasetId], references: [id], onDelete: Cascade)
+
+  @@index([datasetId])
+  @@index([isGenerated])
+  @@map("dataset_files")
+}
+
+model Purchase {
+  id               String         @id @default(uuid())
+  userId           String
+  datasetId        String
+  amount           Decimal        @db.Decimal(10, 2) // 販売価格
+  currency         String
+  status           PurchaseStatus @default(PENDING)
+  paymentMethod    String
+  transactionId    String         @unique
+  purchasedAt      DateTime       @default(now())
+  downloadExpiresAt DateTime?
+  downloadCount    Int            @default(0)
+  maxDownloads     Int            @default(5)
+  // 手数料情報
+  platformFee      Decimal        @db.Decimal(10, 2) // プラットフォーム手数料
+  platformFeeRate  Decimal        @db.Decimal(5, 2)  // 手数料率（例: 15.00 = 15%）
+  paymentFee        Decimal?      @db.Decimal(10, 2) // 決済手数料（Stripe等）
+  sellerAmount     Decimal        @db.Decimal(10, 2) // 販売者への支払い額
+
+  user    User    @relation(fields: [userId], references: [id])
+  dataset Dataset @relation(fields: [datasetId], references: [id])
+  reviews Review[]
+
+  @@index([userId])
+  @@index([datasetId])
+  @@index([status])
+  @@map("purchases")
+}
+
+enum PurchaseStatus {
+  PENDING
+  COMPLETED
+  REFUNDED
+}
+
+model Review {
+  id              String   @id @default(uuid())
+  userId          String
+  datasetId       String
+  purchaseId      String
+  rating          Int      // 1-5
+  title           String
+  comment         String   @db.Text
+  pros            String[]
+  cons            String[]
+  verifiedPurchase Boolean @default(true)
+  helpfulCount    Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user    User    @relation(fields: [userId], references: [id])
+  dataset Dataset @relation(fields: [datasetId], references: [id])
+  purchase Purchase @relation(fields: [purchaseId], references: [id])
+
+  @@unique([userId, datasetId]) // 1ユーザー1レビュー
+  @@index([datasetId])
+  @@index([rating])
+  @@map("reviews")
+}
+
+model Cart {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  items     Json     // { datasetId: string, addedAt: DateTime }[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@map("carts")
+}
+
+model Wishlist {
+  id        String   @id @default(uuid())
+  userId    String
+  datasetId String
+  createdAt DateTime @default(now())
+
+  @@unique([userId, datasetId])
+  @@index([userId])
+  @@map("wishlists")
+}
+
+model PlatformSettings {
+  id                String   @id @default(uuid())
+  platformFeeRate   Decimal  @db.Decimal(5, 2) @default(15.00) // デフォルト15%
+  paymentFeeBearer  String   @default("SELLER") // 'SELLER' | 'PLATFORM' | 'BUYER'
+  minPrice          Decimal? @db.Decimal(10, 2) // 最小価格（オプション）
+  maxPrice          Decimal? @db.Decimal(10, 2) // 最大価格（オプション）
+  allowFreeDatasets Boolean  @default(true)     // 無料データセットを許可
+  updatedAt         DateTime @updatedAt
+  updatedBy         String? // 更新者（管理者ID）
+
+  @@map("platform_settings")
+}

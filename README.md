@@ -8,9 +8,10 @@ AI開発者、研究者、企業向けのデータセット販売・購入プラ
 
 ### ✨ 主要機能
 
+- **🚀 AI自動化開発基盤**: 要件を入力するだけで、仕様書からコード、テスト、レビュー、デプロイまで自動化（新機能）
 - **データセットの検索・購入**: 豊富なカテゴリから目的のデータセットを検索・購入
 - **データセットの販売**: 簡単な手順でデータセットを販売開始
-- **AIデータ拡張機能**: アップロード時にローカルのCPU/GPUを使用して自動でデータセットを拡張（新機能）
+- **AIデータ拡張機能**: アップロード時にローカルのCPU/GPUを使用して自動でデータセットを拡張
 - **レビュー・評価システム**: 購入者がレビューを投稿し、データセットの品質を評価
 - **柔軟な決済**: 手動決済（無料）または自動決済（Stripe、手数料のみ）
 
@@ -31,6 +32,7 @@ AI開発者、研究者、企業向けのデータセット販売・購入プラ
 
 ## 📁 ドキュメント
 
+- [🚀 AI自動化開発基盤](./AUTOMATION_README.md) - 要件から完成システムまで自動化する基盤の使い方
 - [仕様書](./SPECIFICATION.md) - 機能仕様、データモデル、UI/UX設計
 - [技術仕様書](./TECHNICAL_SPEC.md) - データベーススキーマ、API設計、実装詳細
 - [AIデータ拡張機能](./AI_AUGMENTATION_SPEC.md) - AIデータ拡張機能の詳細仕様
@@ -75,7 +77,11 @@ pnpm dev
 - `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` - Google OAuth（無料）
 - `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` - GitHub OAuth（無料）
 
-**詳細は[無料運営ガイド](./FREE_HOSTING_GUIDE.md)を参照してください。**
+**AI自動化基盤を使用する場合（追加）**:
+- `OPENAI_API_KEY` - OpenAI APIキー（有料、必須）
+- `VERCEL_TOKEN` - Vercel APIトークン（デプロイ機能を使用する場合）
+
+**詳細は[無料運営ガイド](./FREE_HOSTING_GUIDE.md)と[AI自動化開発基盤](./AUTOMATION_README.md)を参照してください。**
 
 ## 📝 開発フェーズ
 
@@ -107,7 +113,8 @@ pnpm dev
 ## 🔗 リンク
 
 - **GitHub**: https://github.com/koooohei122/ai-dataset-marketplace
-- **デプロイURL**: 準備中（Vercelにデプロイ後、URLを追加します）
+- **デプロイURL**: https://ai-dataset-marketplace.vercel.app/
+- **ステータス**: 🟢 デプロイ済み（開発中）
 
 ## 📄 ライセンス
 
