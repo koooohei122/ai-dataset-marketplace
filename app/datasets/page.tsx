@@ -20,22 +20,52 @@ interface Dataset {
     name: string
   }
   category: {
+    id: string
     name: string
   }
 }
 
+interface Category {
+  id: string
+  name: string
+  slug: string
+}
+
 export default function DatasetsPage() {
   const [datasets, setDatasets] = useState<Dataset[]>([])
+  const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
+  const [selectedCategory, setSelectedCategory] = useState<string>("")
+  const [priceFilter, setPriceFilter] = useState<"all" | "free" | "paid">("all")
+  const [sortBy, setSortBy] = useState<"newest" | "popular" | "rating" | "price">("newest")
 
   useEffect(() => {
+    fetchCategories()
     fetchDatasets()
-  }, [])
+  }, [selectedCategory, priceFilter, sortBy])
+
+  const fetchCategories = async () => {
+    try {
+      const response = await fetch("/api/categories")
+      if (response.ok) {
+        const data = await response.json()
+        setCategories(data)
+      }
+    } catch (error) {
+      console.error("Failed to fetch categories:", error)
+    }
+  }
 
   const fetchDatasets = async () => {
     try {
-      const response = await fetch("/api/datasets")
+      const params = new URLSearchParams()
+      if (selectedCategory) params.append("category", selectedCategory)
+      if (priceFilter === "free") params.append("isFree", "true")
+      if (priceFilter === "paid") params.append("isFree", "false")
+      params.append("sortBy", sortBy)
+
+      const response = await fetch(`/api/datasets?${params.toString()}`)
       if (response.ok) {
         const data = await response.json()
         setDatasets(data)
@@ -47,11 +77,13 @@ export default function DatasetsPage() {
     }
   }
 
-  const filteredDatasets = datasets.filter((dataset) =>
-    dataset.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    dataset.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    dataset.tags.some((tag) => tag.toLowerCase().includes(searchQuery.toLowerCase()))
-  )
+  const filteredDatasets = datasets.filter((dataset) => {
+    const matchesSearch =
+      dataset.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      dataset.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      dataset.tags.some((tag) => tag.toLowerCase().includes(searchQuery.toLowerCase()))
+    return matchesSearch
+  })
 
   if (loading) {
     return (
@@ -66,6 +98,7 @@ export default function DatasetsPage() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-4">データセット一覧</h1>
         
+        {/* 検索バー */}
         <div className="mb-6">
           <input
             type="text"
@@ -74,6 +107,52 @@ export default function DatasetsPage() {
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full max-w-md px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
+        </div>
+
+        {/* フィルタ */}
+        <div className="flex flex-wrap gap-4 mb-6">
+          <div>
+            <label className="block text-sm font-medium mb-2">カテゴリ</label>
+            <select
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
+              className="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">すべて</option>
+              {categories.map((cat) => (
+                <option key={cat.id} value={cat.id}>
+                  {cat.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2">価格</label>
+            <select
+              value={priceFilter}
+              onChange={(e) => setPriceFilter(e.target.value as "all" | "free" | "paid")}
+              className="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">すべて</option>
+              <option value="free">無料</option>
+              <option value="paid">有料</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2">並び替え</label>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as "newest" | "popular" | "rating" | "price")}
+              className="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="newest">新着順</option>
+              <option value="popular">人気順</option>
+              <option value="rating">評価順</option>
+              <option value="price">価格順</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -145,4 +224,3 @@ export default function DatasetsPage() {
     </div>
   )
 }
-
