@@ -23,7 +23,7 @@ export default function Header() {
               <Link href="/dashboard" className="text-gray-700 dark:text-gray-300 hover:text-blue-600">
                 ダッシュボード
               </Link>
-              <Link href="/upload" className="text-gray-700 dark:text-gray-300 hover:text-blue-600">
+              <Link href="/upload" className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
                 アップロード
               </Link>
               <div className="flex items-center gap-4">
