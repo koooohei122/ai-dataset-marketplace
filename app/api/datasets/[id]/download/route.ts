@@ -1,33 +1,16 @@
 import { NextResponse } from "next/server"
-import { getServerSession } from "next-auth/next"
-import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { createServerClient } from "@/lib/supabase"
+import { getAuthenticatedUserId } from "@/lib/auth-helpers"
+import { formatError, logError } from "@/lib/error-handler"
 
 export async function GET(
   request: Request,
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      )
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email! },
-      select: { id: true },
-    })
-
-    if (!user) {
-      return NextResponse.json(
-        { error: "User not found" },
-        { status: 404 }
-      )
-    }
+    // 認証チェック
+    const userId = await getAuthenticatedUserId()
 
     // データセットを取得
     const dataset = await prisma.dataset.findUnique({
@@ -48,7 +31,7 @@ export async function GET(
     if (!dataset.isFree) {
       const purchase = await prisma.purchase.findFirst({
         where: {
-          userId: user.id,
+          userId: userId,
           datasetId: dataset.id,
           status: "COMPLETED",
         },
@@ -106,10 +89,11 @@ export async function GET(
       { status: 404 }
     )
   } catch (error) {
-    console.error("Download error:", error)
+    logError(error, "Dataset Download")
+    const errorResponse = formatError(error)
     return NextResponse.json(
-      { error: "Failed to download dataset" },
-      { status: 500 }
+      errorResponse,
+      { status: errorResponse.code === 'AUTH_ERROR' ? 401 : 500 }
     )
   }
 }

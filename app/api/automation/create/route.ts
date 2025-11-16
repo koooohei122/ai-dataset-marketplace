@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { AutomationEngine } from '@/lib/ai/automation';
 import { DeployEngine } from '@/lib/automation/deploy';
-import { projects } from '../[projectId]/status/route';
+import { getProject, setProject } from '@/lib/automation/storage';
 
 // プロジェクト管理用の簡易ストレージ（本番環境ではデータベースを使用）
 
 // グローバルインスタンス（実際にはシングルトンパターンを使用）
 const automationEngine = new AutomationEngine({
   openaiApiKey: process.env.OPENAI_API_KEY,
-  model: 'gpt-4o-mini', // GPT-4o mini を使用（コスト効率が良い）
+  model: 'gpt-4', // GPT-4 を使用
 });
 
 const deployEngine = new DeployEngine({
@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
       createdAt: new Date().toISOString(),
     };
 
-    projects.set(projectId, project);
+    setProject(projectId, project);
 
     // 非同期で自動化プロセスを開始
     processAutomation(projectId, requirement).catch(console.error);
@@ -53,77 +53,77 @@ export async function POST(request: NextRequest) {
 }
 
 async function processAutomation(projectId: string, requirement: string) {
-  const project = projects.get(projectId);
+  const project = getProject(projectId);
   if (!project) return;
 
   try {
     // 1. 仕様書生成
     project.status = 'specifying';
     project.progress = 10;
-    projects.set(projectId, project);
+    setProject(projectId, project);
     
     const specification = await generateSpecification(requirement);
     project.specification = specification;
     project.progress = 30;
-    projects.set(projectId, project);
+    setProject(projectId, project);
 
     // 2. コード生成
     project.status = 'coding';
     project.progress = 40;
-    projects.set(projectId, project);
+    setProject(projectId, project);
     
     const code = await generateCode(specification, requirement);
     project.code = code;
     project.progress = 60;
-    projects.set(projectId, project);
+    setProject(projectId, project);
 
     // 3. テスト生成・実行
     project.status = 'testing';
     project.progress = 70;
-    projects.set(projectId, project);
+    setProject(projectId, project);
     
     const testResults = await generateAndRunTests(code, specification);
     project.testResults = testResults;
     project.progress = 80;
-    projects.set(projectId, project);
+    setProject(projectId, project);
 
     // 4. レビュー
     project.status = 'reviewing';
     project.progress = 85;
-    projects.set(projectId, project);
+    setProject(projectId, project);
     
     const review = await reviewCode(code, specification, testResults);
     project.review = review;
     project.progress = 90;
-    projects.set(projectId, project);
+    setProject(projectId, project);
 
     // レビューで問題があれば修正
     if (review.issues && review.issues.length > 0) {
       project.status = 'coding';
       project.progress = 70;
-      projects.set(projectId, project);
+      setProject(projectId, project);
       
       const fixedCode = await fixCode(code, review.issues);
       project.code = fixedCode;
       project.progress = 85;
-      projects.set(projectId, project);
+      setProject(projectId, project);
     }
 
     // 5. デプロイ
     project.status = 'deploying';
     project.progress = 95;
-    projects.set(projectId, project);
+    setProject(projectId, project);
     
     const deployUrl = await deployProject(code, projectId);
     project.deployUrl = deployUrl;
     project.status = 'completed';
     project.progress = 100;
-    projects.set(projectId, project);
+    setProject(projectId, project);
 
   } catch (error) {
     project.status = 'error';
     project.error = error instanceof Error ? error.message : 'Unknown error';
-    projects.set(projectId, project);
+    setProject(projectId, project);
   }
 }
 

@@ -22,10 +22,10 @@ export default function PurchaseCompletePage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (params.purchaseId) {
-      fetchPurchase(params.purchaseId as string)
+    if (params.id) {
+      fetchPurchase(params.id as string)
     }
-  }, [params.purchaseId])
+  }, [params.id])
 
   const fetchPurchase = async (id: string) => {
     try {

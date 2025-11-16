@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
-import { getServerSession } from "next-auth/next"
-import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { getAuthenticatedUserId } from "@/lib/auth-helpers"
+import { formatError, logError } from "@/lib/error-handler"
 import { sendReviewNotificationEmail } from "@/lib/email"
 
 export async function POST(
@@ -9,25 +9,8 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      )
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email! },
-      select: { id: true },
-    })
-
-    if (!user) {
-      return NextResponse.json(
-        { error: "User not found" },
-        { status: 404 }
-      )
-    }
+    // 認証チェック
+    const userId = await getAuthenticatedUserId()
 
     // データセットが存在するか確認
     const dataset = await prisma.dataset.findUnique({
@@ -42,11 +25,11 @@ export async function POST(
     }
 
     // 購入済みかチェック（無料データセットの場合はスキップ）
-    let purchaseId: string | null = null
+    let purchaseId: string = ""
     if (!dataset.isFree) {
       const purchase = await prisma.purchase.findFirst({
         where: {
-          userId: user.id,
+          userId: userId,
           datasetId: dataset.id,
           status: "COMPLETED",
         },
@@ -66,7 +49,7 @@ export async function POST(
     const existingReview = await prisma.review.findUnique({
       where: {
         userId_datasetId: {
-          userId: user.id,
+          userId: userId,
           datasetId: dataset.id,
         },
       },
@@ -100,9 +83,9 @@ export async function POST(
     // レビューを作成
     const review = await prisma.review.create({
       data: {
-        userId: user.id,
+        userId: userId,
         datasetId: dataset.id,
-        purchaseId: purchaseId || "", // 無料データセットの場合は空文字列
+        purchaseId: purchaseId, // 無料データセットの場合は空文字列
         rating: parseInt(rating),
         title,
         comment,
@@ -112,52 +95,53 @@ export async function POST(
       },
     })
 
-    // データセットの評価を更新
-    const allReviews = await prisma.review.findMany({
+    // データセットの評価を更新（集計クエリを使用してN+1問題を回避）
+    const reviewStats = await prisma.review.aggregate({
       where: { datasetId: dataset.id },
-      select: { rating: true },
+      _avg: { rating: true },
+      _count: true,
     })
-
-    const averageRating =
-      allReviews.reduce((sum, r) => sum + r.rating, 0) / allReviews.length
 
     await prisma.dataset.update({
       where: { id: dataset.id },
       data: {
-        rating: averageRating,
-        reviewCount: allReviews.length,
+        rating: reviewStats._avg.rating || 0,
+        reviewCount: reviewStats._count,
       },
     })
 
-    // 販売者にメール通知
-    const seller = await prisma.user.findUnique({
-      where: { id: dataset.sellerId },
-      select: { email: true },
-    })
-    const datasetInfo = await prisma.dataset.findUnique({
-      where: { id: dataset.id },
-      select: { title: true },
-    })
-    const reviewer = await prisma.user.findUnique({
-      where: { id: user.id },
-      select: { name: true },
-    })
-
-    if (seller && datasetInfo && reviewer) {
-      await sendReviewNotificationEmail(
-        seller.email,
-        datasetInfo.title,
-        reviewer.name,
-        parseInt(rating)
-      )
-    }
+    // 販売者にメール通知（非同期、エラーは無視）
+    Promise.all([
+      prisma.user.findUnique({
+        where: { id: dataset.sellerId },
+        select: { email: true },
+      }),
+      prisma.dataset.findUnique({
+        where: { id: dataset.id },
+        select: { title: true },
+      }),
+      prisma.user.findUnique({
+        where: { id: userId },
+        select: { name: true },
+      }),
+    ]).then(([seller, datasetInfo, reviewer]) => {
+      if (seller?.email && datasetInfo && reviewer?.name) {
+        sendReviewNotificationEmail(
+          seller.email,
+          datasetInfo.title,
+          reviewer.name,
+          parseInt(rating)
+        ).catch((err) => logError(err, "Email Send"))
+      }
+    }).catch(() => {})
 
     return NextResponse.json(review)
   } catch (error) {
-    console.error("Review creation error:", error)
+    logError(error, "Review Creation")
+    const errorResponse = formatError(error)
     return NextResponse.json(
-      { error: "Failed to create review" },
-      { status: 500 }
+      errorResponse,
+      { status: errorResponse.code === 'AUTH_ERROR' ? 401 : 500 }
     )
   }
 }

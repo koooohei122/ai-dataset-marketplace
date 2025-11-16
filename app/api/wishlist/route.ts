@@ -30,7 +30,8 @@ export async function GET() {
       include: {
         dataset: {
           include: {
-            category: {
+            category: true,
+            seller: {
               select: {
                 name: true,
               },
@@ -41,9 +42,9 @@ export async function GET() {
       orderBy: {
         createdAt: "desc",
       },
-    })
+    } as any)
 
-    const datasets = wishlistItems.map((item) => item.dataset)
+    const datasets = wishlistItems.map((item: any) => item.dataset)
 
     return NextResponse.json(datasets)
   } catch (error) {
