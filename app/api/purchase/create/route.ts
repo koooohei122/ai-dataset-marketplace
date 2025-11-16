@@ -1,33 +1,32 @@
 import { NextResponse } from "next/server"
-import { getServerSession } from "next-auth/next"
-import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
-import { randomUUID } from "crypto"
+import { getAuthenticatedUserId, getAuthenticatedSession } from "@/lib/auth-helpers"
+import { formatError, logError } from "@/lib/error-handler"
+import { DOWNLOAD_EXPIRY_DAYS, MAX_DOWNLOADS, DEFAULT_PLATFORM_FEE_RATE, STRIPE_FEE_RATE } from "@/lib/constants"
 import { sendPurchaseConfirmationEmail, sendPurchaseRequestEmail } from "@/lib/email"
+import { randomUUID } from "crypto"
 
 export async function POST(request: Request) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      )
-    }
+    // 認証チェック
+    const session = await getAuthenticatedSession()
+    const userId = await getAuthenticatedUserId()
 
     const body = await request.json()
     const { datasetId, paymentMethod } = body
 
-    // ユーザーIDを取得
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email! },
-      select: { id: true },
-    })
-
-    if (!user) {
+    // 入力検証
+    if (!datasetId) {
       return NextResponse.json(
-        { error: "User not found" },
-        { status: 404 }
+        { error: "Dataset ID is required" },
+        { status: 400 }
+      )
+    }
+
+    if (!paymentMethod && typeof paymentMethod !== 'string') {
+      return NextResponse.json(
+        { error: "Payment method is required" },
+        { status: 400 }
       )
     }
 
@@ -50,7 +49,7 @@ export async function POST(request: Request) {
     }
 
     // 自分自身のデータセットは購入できない
-    if (dataset.sellerId === user.id) {
+    if (dataset.sellerId === userId) {
       return NextResponse.json(
         { error: "Cannot purchase your own dataset" },
         { status: 400 }
@@ -60,7 +59,7 @@ export async function POST(request: Request) {
     // 既に購入済みかチェック
     const existingPurchase = await prisma.purchase.findFirst({
       where: {
-        userId: user.id,
+        userId: userId,
         datasetId: dataset.id,
         status: "COMPLETED",
       },
@@ -75,28 +74,28 @@ export async function POST(request: Request) {
 
     // プラットフォーム設定を取得
     const settings = await prisma.platformSettings.findFirst()
-    const platformFeeRate = settings?.platformFeeRate || 15.0
+    const platformFeeRate = Number(settings?.platformFeeRate || DEFAULT_PLATFORM_FEE_RATE)
 
     // 手数料を計算
     const amount = dataset.isFree ? 0 : Number(dataset.price)
     const platformFee = dataset.isFree ? 0 : Math.floor(amount * (platformFeeRate / 100))
-    const sellerAmount = amount - platformFee
     const paymentFee = paymentMethod === "stripe" && !dataset.isFree
-      ? Math.ceil(amount * 0.036)
+      ? Math.ceil(amount * STRIPE_FEE_RATE)
       : null
+    const sellerAmount = amount - platformFee - (paymentFee || 0)
 
     // 購入レコードを作成
     const purchase = await prisma.purchase.create({
       data: {
-        userId: user.id,
+        userId: userId,
         datasetId: dataset.id,
         amount,
         currency: "JPY",
-        status: dataset.isFree ? "COMPLETED" : paymentMethod === "stripe" ? "PENDING" : "PENDING",
+        status: dataset.isFree ? "COMPLETED" : "PENDING",
         paymentMethod: paymentMethod || (dataset.isFree ? "free" : "manual"),
         transactionId: randomUUID(),
-        downloadExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30日後
-        maxDownloads: 5,
+        downloadExpiresAt: new Date(Date.now() + DOWNLOAD_EXPIRY_DAYS * 24 * 60 * 60 * 1000),
+        maxDownloads: MAX_DOWNLOADS,
         platformFee,
         platformFeeRate,
         paymentFee,
@@ -112,18 +111,19 @@ export async function POST(request: Request) {
         data: { purchases: { increment: 1 } },
       })
 
-      // 購入確認メールを送信
-      const datasetInfo = await prisma.dataset.findUnique({
+      // 購入確認メールを送信（非同期、エラーは無視）
+      prisma.dataset.findUnique({
         where: { id: dataset.id },
         select: { title: true },
-      })
-      if (datasetInfo) {
-        await sendPurchaseConfirmationEmail(
-          session.user.email!,
-          datasetInfo.title,
-          purchase.id
-        )
-      }
+      }).then((datasetInfo) => {
+        if (datasetInfo && session.user.email) {
+          sendPurchaseConfirmationEmail(
+            session.user.email,
+            datasetInfo.title,
+            purchase.id
+          ).catch((err) => logError(err, "Email Send"))
+        }
+      }).catch(() => {})
 
       return NextResponse.json({
         purchaseId: purchase.id,
@@ -143,25 +143,27 @@ export async function POST(request: Request) {
     }
 
     // 手動決済の場合
-    // 販売者にメール通知
-    const seller = await prisma.user.findUnique({
-      where: { id: dataset.sellerId },
-      select: { email: true, name: true },
-    })
-    const datasetInfo = await prisma.dataset.findUnique({
-      where: { id: dataset.id },
-      select: { title: true },
-    })
-
-    if (seller && datasetInfo) {
-      await sendPurchaseRequestEmail(
-        seller.email,
-        session.user.name || session.user.email!,
-        datasetInfo.title,
-        amount,
-        purchase.id
-      )
-    }
+    // 販売者にメール通知（非同期、エラーは無視）
+    Promise.all([
+      prisma.user.findUnique({
+        where: { id: dataset.sellerId },
+        select: { email: true, name: true },
+      }),
+      prisma.dataset.findUnique({
+        where: { id: dataset.id },
+        select: { title: true },
+      }),
+    ]).then(([seller, datasetInfo]) => {
+      if (seller?.email && datasetInfo) {
+        sendPurchaseRequestEmail(
+          seller.email,
+          session.user.name || session.user.email || 'Unknown',
+          datasetInfo.title,
+          amount,
+          purchase.id
+        ).catch((err) => logError(err, "Email Send"))
+      }
+    }).catch(() => {})
 
     return NextResponse.json({
       purchaseId: purchase.id,
@@ -169,10 +171,11 @@ export async function POST(request: Request) {
       message: "販売者に連絡して決済を完了してください",
     })
   } catch (error) {
-    console.error("Purchase creation error:", error)
+    logError(error, "Purchase Creation")
+    const errorResponse = formatError(error)
     return NextResponse.json(
-      { error: "Failed to create purchase" },
-      { status: 500 }
+      errorResponse,
+      { status: errorResponse.code === 'AUTH_ERROR' ? 401 : 500 }
     )
   }
 }

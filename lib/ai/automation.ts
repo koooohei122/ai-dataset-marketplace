@@ -67,7 +67,7 @@ export class AutomationEngine {
 
   constructor(config: AutomationConfig) {
     this.config = {
-      model: 'gpt-4o-mini', // GPT-4o mini をデフォルトに（コスト効率が良い）
+      model: 'gpt-4', // GPT-4 をデフォルトに
       temperature: 0.7,
       ...config,
     };

@@ -27,7 +27,7 @@ export async function GET(
 
     // 手数料を計算
     const price = Number(dataset.price)
-    const platformFee = Math.floor(price * (platformFeeRate / 100))
+    const platformFee = Math.floor(price * (Number(platformFeeRate) / 100))
     const sellerAmount = price - platformFee
 
     // 決済手数料（Stripe使用時、約3.6%）

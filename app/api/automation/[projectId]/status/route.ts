@@ -1,13 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-
-// プロジェクト管理用の簡易ストレージ（本番環境ではデータベースを使用）
-// 実際には外部ストレージ（Redis、データベース等）を使用
-// 注意: この実装はメモリ内のみで、サーバー再起動でデータが失われます
-// 本番環境ではデータベースを使用してください
-const projects = new Map<string, any>();
-
-// グローバルストレージとして使用（実際には外部ストレージが必要）
-export { projects };
+import { getProject } from '@/lib/automation/storage';
 
 export async function GET(
   request: NextRequest,
@@ -17,7 +9,7 @@ export async function GET(
     const { projectId } = params;
     
     // 実際にはデータベースから取得
-    const project = projects.get(projectId);
+    const project = getProject(projectId);
 
     if (!project) {
       return NextResponse.json(
@@ -35,4 +27,3 @@ export async function GET(
     );
   }
 }
-
