@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { useParams } from "next/navigation"
 import Link from "next/link"
 import { useSession } from "next-auth/react"
+import ReviewsSection from "@/components/ReviewsSection"
 
 interface Dataset {
   id: string
@@ -144,6 +145,11 @@ export default function DatasetDetailPage() {
             <p className="text-gray-700 dark:text-gray-300 whitespace-pre-line">
               {dataset.description}
             </p>
+          </div>
+
+          <div className="mb-8">
+            <h2 className="text-2xl font-semibold mb-4">レビュー</h2>
+            <ReviewsSection datasetId={dataset.id} />
           </div>
 
           <div className="mb-8">
