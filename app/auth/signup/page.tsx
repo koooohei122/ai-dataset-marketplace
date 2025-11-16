@@ -1,44 +1,75 @@
 "use client"
 
 import { useState } from "react"
-import { signIn } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
+import { signIn } from "next-auth/react"
 
-export default function SignInPage() {
+export default function SignUpPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [formData, setFormData] = useState({
+    name: "",
     email: "",
     password: "",
+    confirmPassword: "",
   })
 
-  const handleEmailSignIn = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
     setLoading(true)
 
+    // バリデーション
+    if (formData.password !== formData.confirmPassword) {
+      setError("パスワードが一致しません")
+      setLoading(false)
+      return
+    }
+
+    if (formData.password.length < 8) {
+      setError("パスワードは8文字以上である必要があります")
+      setLoading(false)
+      return
+    }
+
     try {
+      const response = await fetch("/api/auth/signup", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: formData.name,
+          email: formData.email,
+          password: formData.password,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        setError(data.error || "登録に失敗しました")
+        setLoading(false)
+        return
+      }
+
+      // 登録成功後、自動的にログイン
       const result = await signIn("credentials", {
         email: formData.email,
         password: formData.password,
         redirect: false,
       })
 
-      if (result?.error) {
-        setError("メールアドレスまたはパスワードが正しくありません")
-        setLoading(false)
-        return
-      }
-
       if (result?.ok) {
         router.push("/")
-        router.refresh()
+      } else {
+        router.push("/auth/signin")
       }
     } catch (error) {
-      console.error("Signin error:", error)
-      setError("ログイン中にエラーが発生しました")
+      console.error("Signup error:", error)
+      setError("登録中にエラーが発生しました")
       setLoading(false)
     }
   }
@@ -48,10 +79,10 @@ export default function SignInPage() {
       <div className="w-full max-w-md space-y-8 rounded-lg border bg-white dark:bg-gray-800 p-8 shadow-lg">
         <div>
           <h2 className="mt-6 text-center text-3xl font-bold">
-            ログイン
+            アカウント作成
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600 dark:text-gray-400">
-            AIデータセットマーケットプレイスにログイン
+            AIデータセットマーケットプレイスにアカウントを作成
           </p>
         </div>
 
@@ -61,8 +92,26 @@ export default function SignInPage() {
           </div>
         )}
 
-        <form className="mt-8 space-y-6" onSubmit={handleEmailSignIn}>
+        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           <div className="space-y-4">
+            <div>
+              <label htmlFor="name" className="block text-sm font-medium mb-2">
+                お名前
+              </label>
+              <input
+                id="name"
+                name="name"
+                type="text"
+                required
+                value={formData.name}
+                onChange={(e) =>
+                  setFormData({ ...formData, name: e.target.value })
+                }
+                className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="山田 太郎"
+              />
+            </div>
+
             <div>
               <label htmlFor="email" className="block text-sm font-medium mb-2">
                 メールアドレス
@@ -95,7 +144,27 @@ export default function SignInPage() {
                   setFormData({ ...formData, password: e.target.value })
                 }
                 className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="パスワードを入力"
+                placeholder="8文字以上"
+                minLength={8}
+              />
+            </div>
+
+            <div>
+              <label htmlFor="confirmPassword" className="block text-sm font-medium mb-2">
+                パスワード（確認）
+              </label>
+              <input
+                id="confirmPassword"
+                name="confirmPassword"
+                type="password"
+                required
+                value={formData.confirmPassword}
+                onChange={(e) =>
+                  setFormData({ ...formData, confirmPassword: e.target.value })
+                }
+                className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="パスワードを再入力"
+                minLength={8}
               />
             </div>
           </div>
@@ -106,7 +175,7 @@ export default function SignInPage() {
               disabled={loading}
               className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-medium"
             >
-              {loading ? "ログイン中..." : "ログイン"}
+              {loading ? "登録中..." : "アカウントを作成"}
             </button>
           </div>
         </form>
@@ -146,7 +215,7 @@ export default function SignInPage() {
                   d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
                 />
               </svg>
-              Googleでログイン
+              Googleで登録
             </button>
             <button
               onClick={() => signIn("github", { callbackUrl: "/" })}
@@ -159,23 +228,24 @@ export default function SignInPage() {
                   clipRule="evenodd"
                 />
               </svg>
-              GitHubでログイン
+              GitHubで登録
             </button>
           </div>
         </div>
 
         <div className="text-center text-sm">
           <span className="text-gray-600 dark:text-gray-400">
-            アカウントをお持ちでないですか？{" "}
+            すでにアカウントをお持ちですか？{" "}
           </span>
           <Link
-            href="/auth/signup"
+            href="/auth/signin"
             className="text-blue-600 hover:text-blue-700 font-medium"
           >
-            新規登録
+            ログイン
           </Link>
         </div>
       </div>
     </div>
   )
 }
+
