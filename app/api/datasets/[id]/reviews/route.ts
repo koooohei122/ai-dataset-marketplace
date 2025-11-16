@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { getServerSession } from "next-auth/next"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { sendReviewNotificationEmail } from "@/lib/email"
 
 export async function POST(
   request: Request,
@@ -127,6 +128,29 @@ export async function POST(
         reviewCount: allReviews.length,
       },
     })
+
+    // 販売者にメール通知
+    const seller = await prisma.user.findUnique({
+      where: { id: dataset.sellerId },
+      select: { email: true },
+    })
+    const datasetInfo = await prisma.dataset.findUnique({
+      where: { id: dataset.id },
+      select: { title: true },
+    })
+    const reviewer = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: { name: true },
+    })
+
+    if (seller && datasetInfo && reviewer) {
+      await sendReviewNotificationEmail(
+        seller.email,
+        datasetInfo.title,
+        reviewer.name,
+        parseInt(rating)
+      )
+    }
 
     return NextResponse.json(review)
   } catch (error) {
