@@ -1,19 +1,34 @@
 import { NextResponse } from "next/server"
-import { getServerSession } from "next-auth"
+import { getServerSession } from "next-auth/next"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { createServerClient } from "@/lib/supabase"
-import { v4 as uuidv4 } from "uuid"
+import { randomUUID } from "crypto"
 
 export async function POST(request: Request) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session?.user?.id) {
+    if (!session?.user) {
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }
       )
     }
+
+    // ユーザーIDを取得（データベースから取得）
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email! },
+      select: { id: true },
+    })
+
+    if (!user) {
+      return NextResponse.json(
+        { error: "User not found" },
+        { status: 404 }
+      )
+    }
+
+    const userId = user.id
 
     const formData = await request.formData()
     
