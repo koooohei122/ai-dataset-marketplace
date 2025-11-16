@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth/next"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { randomUUID } from "crypto"
+import { sendPurchaseConfirmationEmail, sendPurchaseRequestEmail } from "@/lib/email"
 
 export async function POST(request: Request) {
   try {
@@ -111,6 +112,19 @@ export async function POST(request: Request) {
         data: { purchases: { increment: 1 } },
       })
 
+      // 購入確認メールを送信
+      const datasetInfo = await prisma.dataset.findUnique({
+        where: { id: dataset.id },
+        select: { title: true },
+      })
+      if (datasetInfo) {
+        await sendPurchaseConfirmationEmail(
+          session.user.email!,
+          datasetInfo.title,
+          purchase.id
+        )
+      }
+
       return NextResponse.json({
         purchaseId: purchase.id,
         status: "completed",
@@ -129,6 +143,26 @@ export async function POST(request: Request) {
     }
 
     // 手動決済の場合
+    // 販売者にメール通知
+    const seller = await prisma.user.findUnique({
+      where: { id: dataset.sellerId },
+      select: { email: true, name: true },
+    })
+    const datasetInfo = await prisma.dataset.findUnique({
+      where: { id: dataset.id },
+      select: { title: true },
+    })
+
+    if (seller && datasetInfo) {
+      await sendPurchaseRequestEmail(
+        seller.email,
+        session.user.name || session.user.email!,
+        datasetInfo.title,
+        amount,
+        purchase.id
+      )
+    }
+
     return NextResponse.json({
       purchaseId: purchase.id,
       status: "pending",
