@@ -265,6 +265,17 @@ model Wishlist {
   @@map("wishlists")
 }
 
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  email     String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([email])
+  @@map("password_reset_tokens")
+}
+
 model PlatformSettings {
   id                String   @id @default(uuid())
   platformFeeRate   Decimal  @db.Decimal(5, 2) @default(15.00) // デフォルト15%

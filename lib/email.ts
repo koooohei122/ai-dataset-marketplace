@@ -120,3 +120,34 @@ export async function sendPurchaseRequestEmail(
   })
 }
 
+export async function sendPasswordResetEmail(
+  email: string,
+  name: string,
+  token: string
+) {
+  const resetUrl = `${process.env.NEXTAUTH_URL}/auth/reset-password?token=${token}`
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <h2>パスワードリセットのご案内</h2>
+      <p>${name} さん、</p>
+      <p>パスワードリセットのリクエストを受け付けました。以下のボタンをクリックして新しいパスワードを設定してください。</p>
+      <p style="text-align: center; margin: 32px 0;">
+        <a href="${resetUrl}"
+           style="background-color: #2563eb; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold;">
+          パスワードをリセット
+        </a>
+      </p>
+      <p style="color: #6b7280; font-size: 14px;">このリンクは60分間有効です。</p>
+      <p style="color: #6b7280; font-size: 14px;">心当たりがない場合はこのメールを無視してください。パスワードは変更されません。</p>
+      <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
+      <p style="color: #9ca3af; font-size: 12px;">AI Dataset Marketplace</p>
+    </div>
+  `
+
+  return sendEmail({
+    to: email,
+    subject: "[AI Dataset Marketplace] パスワードリセット",
+    html,
+  })
+}
+
