@@ -24,6 +24,8 @@ export default function PurchasesPage() {
   const { data: session } = useSession()
   const [purchases, setPurchases] = useState<Purchase[]>([])
   const [loading, setLoading] = useState(true)
+  const [downloadingId, setDownloadingId] = useState<string | null>(null)
+  const [downloadError, setDownloadError] = useState<string | null>(null)
 
   useEffect(() => {
     if (session) {
@@ -45,26 +47,36 @@ export default function PurchasesPage() {
     }
   }
 
-  const handleDownload = async (datasetId: string) => {
+  const handleDownload = async (datasetId: string, datasetTitle: string) => {
+    setDownloadingId(datasetId)
+    setDownloadError(null)
     try {
       const response = await fetch(`/api/datasets/${datasetId}/download`)
       if (response.ok) {
+        const contentDisposition = response.headers.get("Content-Disposition")
+        const filenameMatch = contentDisposition?.match(/filename="(.+)"/)
+        const filename = filenameMatch ? decodeURIComponent(filenameMatch[1]) : `${datasetTitle}.zip`
+
         const blob = await response.blob()
         const url = window.URL.createObjectURL(blob)
         const a = document.createElement("a")
         a.href = url
-        a.download = `dataset.zip`
+        a.download = filename
         document.body.appendChild(a)
         a.click()
         window.URL.revokeObjectURL(url)
         document.body.removeChild(a)
         fetchPurchases()
       } else {
-        alert("ダウンロードに失敗しました")
+        const data = await response.json().catch(() => ({}))
+        const msg = data.message || data.error || "ダウンロードに失敗しました"
+        setDownloadError(msg)
       }
     } catch (error) {
       console.error("Download error:", error)
-      alert("ダウンロード中にエラーが発生しました")
+      setDownloadError("ダウンロード中にエラーが発生しました")
+    } finally {
+      setDownloadingId(null)
     }
   }
 
@@ -92,6 +104,18 @@ export default function PurchasesPage() {
   return (
     <div className="container mx-auto px-4 py-8">
       <h1 className="text-3xl font-bold mb-8">購入履歴</h1>
+
+      {downloadError && (
+        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+          {downloadError}
+          <button
+            onClick={() => setDownloadError(null)}
+            className="ml-2 text-red-500 hover:text-red-700 font-bold"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {purchases.length === 0 ? (
         <div className="text-center py-12">
@@ -166,10 +190,11 @@ export default function PurchasesPage() {
                   </div>
                   {canDownload ? (
                     <button
-                      onClick={() => handleDownload(purchase.dataset.id)}
-                      className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                      onClick={() => handleDownload(purchase.dataset.id, purchase.dataset.title)}
+                      disabled={downloadingId === purchase.dataset.id}
+                      className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      ダウンロード
+                      {downloadingId === purchase.dataset.id ? "ダウンロード中..." : "ダウンロード"}
                     </button>
                   ) : (
                     <div className="text-sm text-gray-500">
