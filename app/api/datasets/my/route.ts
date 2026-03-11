@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { getServerSession } from "next-auth/next"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { DEFAULT_PLATFORM_FEE_RATE } from "@/lib/constants"
 
 export async function GET() {
   try {
@@ -25,6 +26,13 @@ export async function GET() {
         { status: 404 }
       )
     }
+
+    // プラットフォーム手数料をDBから取得
+    const platformSettings = await prisma.platformSettings.findFirst()
+    const feeRate = platformSettings
+      ? Number(platformSettings.platformFeeRate) / 100
+      : DEFAULT_PLATFORM_FEE_RATE / 100
+    const sellerRate = 1 - feeRate
 
     // ユーザーのデータセットを取得
     const datasets = await prisma.dataset.findMany({
@@ -50,8 +58,7 @@ export async function GET() {
     const stats = {
       totalSales: datasets.reduce((sum, d) => sum + d.purchases, 0),
       totalRevenue: datasets.reduce((sum, d) => {
-        // プラットフォーム手数料15%を考慮
-        const revenue = d.isFree ? 0 : Number(d.price) * d.purchases * 0.85
+        const revenue = d.isFree ? 0 : Number(d.price) * d.purchases * sellerRate
         return sum + revenue
       }, 0),
       totalViews: datasets.reduce((sum, d) => sum + d.views, 0),

@@ -30,6 +30,7 @@ export async function GET(
     // 販売者本人は無制限でダウンロード可能
     const isSeller = dataset.sellerId === userId
 
+    let purchaseId: string | null = null
     if (!dataset.isFree && !isSeller) {
       const purchase = await prisma.purchase.findFirst({
         where: {
@@ -51,10 +52,7 @@ export async function GET(
         return NextResponse.json({ error: "Download expired" }, { status: 403 })
       }
 
-      await prisma.purchase.update({
-        where: { id: purchase.id },
-        data: { downloadCount: { increment: 1 } },
-      })
+      purchaseId = purchase.id
     }
 
     const files = dataset.files
@@ -76,6 +74,14 @@ export async function GET(
         return NextResponse.json({ error: "Failed to download file" }, { status: 500 })
       }
 
+      // ファイル取得成功後にダウンロード回数を記録
+      if (purchaseId) {
+        await prisma.purchase.update({
+          where: { id: purchaseId },
+          data: { downloadCount: { increment: 1 } },
+        })
+      }
+
       const buffer = Buffer.from(await data.arrayBuffer())
       return new NextResponse(buffer, {
         headers: {
@@ -87,6 +93,35 @@ export async function GET(
     }
 
     // 複数ファイルはZIPにまとめてストリーム
+    // 全ファイルを先に取得してから回数をカウント（途中失敗でもカウントが無駄にならないよう）
+    const fileBuffers: { fileName: string; buffer: Buffer }[] = []
+    for (const file of files) {
+      const { data, error } = await supabase.storage
+        .from("datasets")
+        .download(file.filePath)
+
+      if (error || !data) {
+        logError(error ?? new Error("No data"), `Supabase Storage Download: ${file.fileName}`)
+        return NextResponse.json(
+          { error: `ファイル "${file.fileName}" の取得に失敗しました` },
+          { status: 500 }
+        )
+      }
+
+      fileBuffers.push({
+        fileName: file.fileName,
+        buffer: Buffer.from(await data.arrayBuffer()),
+      })
+    }
+
+    // 全ファイル取得成功後にダウンロード回数を記録
+    if (purchaseId) {
+      await prisma.purchase.update({
+        where: { id: purchaseId },
+        data: { downloadCount: { increment: 1 } },
+      })
+    }
+
     const passThrough = new PassThrough()
     const archive = archiver("zip", { zlib: { level: 6 } })
 
@@ -97,19 +132,8 @@ export async function GET(
 
     archive.pipe(passThrough)
 
-    // Supabase Storageから各ファイルを取得してZIPに追加
-    for (const file of files) {
-      const { data, error } = await supabase.storage
-        .from("datasets")
-        .download(file.filePath)
-
-      if (error || !data) {
-        logError(error ?? new Error("No data"), `Supabase Storage Download: ${file.fileName}`)
-        continue
-      }
-
-      const buffer = Buffer.from(await data.arrayBuffer())
-      archive.append(buffer, { name: file.fileName })
+    for (const { fileName, buffer } of fileBuffers) {
+      archive.append(buffer, { name: fileName })
     }
 
     archive.finalize()
