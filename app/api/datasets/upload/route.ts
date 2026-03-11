@@ -197,12 +197,6 @@ export async function POST(request: Request) {
       }
     })
 
-    // AI拡張が有効な場合は、バックグラウンドで処理を開始（将来実装）
-    if (enableAugmentation) {
-      // TODO: AI拡張処理を開始
-      // クライアントサイドで処理する場合は、フロントエンドで実装
-    }
-
     return NextResponse.json({ id: dataset.id }, { status: 201 })
   } catch (error) {
     logError(error, "Dataset Upload")

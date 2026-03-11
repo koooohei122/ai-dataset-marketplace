@@ -27,24 +27,23 @@ export async function GET() {
 
     const wishlistItems = await prisma.wishlist.findMany({
       where: { userId: user.id },
-      include: {
-        dataset: {
-          include: {
-            category: true,
-            seller: {
-              select: {
-                name: true,
-              },
-            },
-          },
-        },
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-    } as any)
+      orderBy: { createdAt: "desc" },
+      select: { datasetId: true },
+    })
 
-    const datasets = wishlistItems.map((item: any) => item.dataset)
+    const datasetIds = wishlistItems.map((item) => item.datasetId)
+
+    const datasetList = await prisma.dataset.findMany({
+      where: { id: { in: datasetIds } },
+      include: {
+        category: true,
+        seller: { select: { name: true } },
+      },
+    })
+
+    // ウィッシュリストの追加順を維持
+    const datasetMap = new Map(datasetList.map((d) => [d.id, d]))
+    const datasets = datasetIds.map((id) => datasetMap.get(id)).filter(Boolean)
 
     return NextResponse.json(datasets)
   } catch (error) {

@@ -131,15 +131,12 @@ export async function POST(request: Request) {
       })
     }
 
-    // Stripe決済の場合
+    // Stripe決済の場合（未実装）
     if (paymentMethod === "stripe") {
-      // TODO: Stripe Checkout Sessionを作成
-      // 現在は手動決済のみ対応
-      return NextResponse.json({
-        purchaseId: purchase.id,
-        status: "pending",
-        message: "Stripe決済は今後実装予定です。現在は手動決済をご利用ください。",
-      })
+      return NextResponse.json(
+        { error: "Stripe決済は現在対応していません。手動決済をご利用ください。" },
+        { status: 501 }
+      )
     }
 
     // 手動決済の場合
