@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <title>Web AR Occlusion</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body, #root { width: 100%; height: 100%; overflow: hidden; background: #000; }
+    </style>
+
+    <!--
+      MindAR: Loaded via CDN to avoid Vite bundler issues with WASM/workers.
+      Pinned version for stability. Change version here if upgrading.
+    -->
+    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-three.prod.js"></script>
+    <script type="module" crossorigin src="/ar-creator-reader/assets/index-EtkuPruG.js"></script>
+    <link rel="modulepreload" crossorigin href="/ar-creator-reader/assets/three-Bn1ETGfP.js">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
