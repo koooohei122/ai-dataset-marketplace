@@ -57,10 +57,10 @@ Vercelダッシュボードで環境変数を設定：
 ```env
 DATABASE_URL=[.envファイルと同じ値]
 SUPABASE_URL=https://ldfsutigtryclnsfeezf.supabase.co
-SUPABASE_ANON_KEY=***REMOVED_ANON_KEY***
-SUPABASE_SERVICE_ROLE_KEY=***REMOVED_SERVICE_ROLE_KEY***
+SUPABASE_ANON_KEY=[SupabaseダッシュボードのSettings→APIで取得]
+SUPABASE_SERVICE_ROLE_KEY=[SupabaseダッシュボードのSettings→APIで取得]
 NEXTAUTH_URL=https://ai-dataset-marketplace.vercel.app
-NEXTAUTH_SECRET=***REMOVED_NEXTAUTH_SECRET***
+NEXTAUTH_SECRET=[openssl rand -base64 32 で生成]
 ```
 
 ### 2. 開発サーバーの起動

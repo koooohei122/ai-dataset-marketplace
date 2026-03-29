@@ -53,8 +53,8 @@ PowerShellで実行:
 ```env
 DATABASE_URL=postgresql://postgres:[PASSWORD]@db.ldfsutigtryclnsfeezf.supabase.co:5432/postgres
 SUPABASE_URL=https://ldfsutigtryclnsfeezf.supabase.co
-SUPABASE_ANON_KEY=***REMOVED_ANON_KEY***
-SUPABASE_SERVICE_ROLE_KEY=***REMOVED_SERVICE_ROLE_KEY***
+SUPABASE_ANON_KEY=[SupabaseダッシュボードのSettings→APIで取得]
+SUPABASE_SERVICE_ROLE_KEY=[SupabaseダッシュボードのSettings→APIで取得]
 NEXTAUTH_URL=https://ai-dataset-marketplace.vercel.app
 NEXTAUTH_SECRET=[生成したシークレット]
 ```
