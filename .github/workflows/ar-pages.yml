@@ -1,0 +1,45 @@
+name: Deploy Web AR to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+      - claude/web-ar-occlusion-spBt5   # ← feature branch でも確認できる
+  workflow_dispatch:
+
+permissions:
+  contents: write   # gh-pages ブランチへの書き込みに必要
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: web-ar/package-lock.json
+
+      - name: Install dependencies
+        working-directory: web-ar
+        run: npm ci
+
+      - name: Build (GitHub Pages base path)
+        working-directory: web-ar
+        run: npm run build
+        # GITHUB_ACTIONS=true は Actions 環境で自動セットされる
+        # vite.config.ts がこの env var を見て base を切り替える
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: web-ar/dist
+          # 既存の gh-pages コンテンツを保持しない（AR アプリを root に展開）
+          force_orphan: true
+          commit_message: 'Deploy Web AR app [ci skip]'
