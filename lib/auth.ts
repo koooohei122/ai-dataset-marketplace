@@ -17,53 +17,66 @@ declare module "next-auth" {
   }
 }
 
+const credentialsProvider = CredentialsProvider({
+  name: "Credentials",
+  credentials: {
+    email: { label: "Email", type: "email" },
+    password: { label: "Password", type: "password" },
+  },
+  async authorize(credentials) {
+    if (!credentials?.email || !credentials?.password) {
+      return null
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { email: credentials.email },
+    })
+
+    if (!user || !user.passwordHash) {
+      return null
+    }
+
+    const isPasswordValid = await bcrypt.compare(
+      credentials.password,
+      user.passwordHash
+    )
+
+    if (!isPasswordValid) {
+      return null
+    }
+
+    return {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+    }
+  },
+})
+
+const providers: any[] = [credentialsProvider]
+
+if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+  providers.push(
+    GoogleProvider({
+      clientId: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    })
+  )
+}
+
+if (process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET) {
+  providers.push(
+    GitHubProvider({
+      clientId: process.env.GITHUB_CLIENT_ID,
+      clientSecret: process.env.GITHUB_CLIENT_SECRET,
+    })
+  )
+}
+
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma) as any,
-  providers: [
-    CredentialsProvider({
-      name: "Credentials",
-      credentials: {
-        email: { label: "Email", type: "email" },
-        password: { label: "Password", type: "password" },
-      },
-      async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
-          return null
-        }
-
-        const user = await prisma.user.findUnique({
-          where: { email: credentials.email },
-        })
-
-        if (!user || !user.passwordHash) {
-          return null
-        }
-
-        const isPasswordValid = await bcrypt.compare(
-          credentials.password,
-          user.passwordHash
-        )
-
-        if (!isPasswordValid) {
-          return null
-        }
-
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-        }
-      },
-    }),
-    GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID || "",
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
-    }),
-    GitHubProvider({
-      clientId: process.env.GITHUB_CLIENT_ID || "",
-      clientSecret: process.env.GITHUB_CLIENT_SECRET || "",
-    }),
-  ],
+  providers,
+  secret: process.env.NEXTAUTH_SECRET || "dev-only-secret-change-in-production",
   pages: {
     signIn: "/auth/signin",
     signOut: "/auth/signout",
@@ -72,13 +85,13 @@ export const authOptions: NextAuthOptions = {
     strategy: "jwt",
   },
   callbacks: {
-    async session({ session, token, user }) {
+    async session({ session, token }) {
       if (session.user) {
         session.user.id = token.sub as string
       }
       return session
     },
-    async jwt({ token, user, account }) {
+    async jwt({ token, user }) {
       if (user) {
         token.sub = user.id
       }
@@ -86,4 +99,3 @@ export const authOptions: NextAuthOptions = {
     },
   },
 }
-
