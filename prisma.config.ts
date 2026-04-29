@@ -1,9 +1,13 @@
-import { defineConfig, env } from "prisma/config";
+import { defineConfig } from "prisma/config";
 import dotenv from "dotenv";
 
 // .envファイルを明示的に読み込む
 dotenv.config({ path: ".env" });
 dotenv.config({ path: ".env.local" });
+
+const databaseUrl =
+  process.env.DATABASE_URL ||
+  "postgresql://placeholder:placeholder@localhost:5432/placeholder";
 
 export default defineConfig({
   schema: "prisma/schema.prisma",
@@ -12,6 +16,6 @@ export default defineConfig({
   },
   engine: "classic",
   datasource: {
-    url: env("DATABASE_URL"),
+    url: databaseUrl,
   },
 });
