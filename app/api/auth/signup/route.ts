@@ -83,6 +83,16 @@ export async function POST(request: Request) {
     logError(error, "Signup")
     const errorResponse = formatError(error)
     
+
+    // DB接続や環境変数不足の初期化エラー
+    if (error instanceof Error) {
+      if (error.message.includes('DATABASE_URL') || error.message.includes('PrismaClientInitializationError')) {
+        return NextResponse.json(
+          { error: 'サーバー設定エラーのため登録できません。管理者にお問い合わせください。' },
+          { status: 503 }
+        )
+      }
+    }
     // Prismaの一意制約エラーの場合
     if (error && typeof error === 'object' && 'code' in error && error.code === 'P2002') {
       return NextResponse.json(
